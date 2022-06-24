@@ -19,6 +19,7 @@ from typing import List, Tuple, Union, Mapping, Any
 
 # Models
 import hdbscan
+import pacmap
 from umap import UMAP
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -1393,15 +1394,19 @@ class BERTopic:
         Returns:
             umap_embeddings: The reduced embeddings
         """
-        try:
-            self.umap_model.fit(embeddings, y=y)
-        except TypeError:
-            logger.info("The dimensionality reduction algorithm did not contain the `y` parameter and"
-                        " therefore the `y` parameter was not used")
-            self.umap_model.fit(embeddings)
+        if isinstance(self.umap_model, pacmap.PaCMAP):
+            logger.info("Using PaCMAP model. This will call `fit_transform` only. PacMAP also does not use the `y` parameter.")
+            umap_embeddings = self.umap_model.fit_transform(embeddings)
+        else:
+            try:
+                self.umap_model.fit(embeddings, y=y)
+            except TypeError:
+                logger.info("The dimensionality reduction algorithm did not contain the `y` parameter and"
+                            " therefore the `y` parameter was not used")
+                self.umap_model.fit(embeddings)
 
-        umap_embeddings = self.umap_model.transform(embeddings)
-        logger.info("Reduced dimensionality")
+            umap_embeddings = self.umap_model.transform(embeddings)
+            logger.info("Reduced dimensionality")
         return np.nan_to_num(umap_embeddings)
 
     def _cluster_embeddings(self,

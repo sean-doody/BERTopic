@@ -14,6 +14,7 @@ docs_packages = [
 base_packages = [
     "numpy>=1.20.0",
     "hdbscan>=0.8.28",
+    "pacmap>=0.6.3",
     "umap-learn>=0.5.0",
     "pandas>=1.1.5",
     "scikit-learn>=0.22.2.post1",
