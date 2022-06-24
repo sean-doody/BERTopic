@@ -371,38 +371,44 @@ class BERTopic:
         topics, probs = topic_model.transform(docs, embeddings)
         ```
         """
-        check_is_fitted(self)
-        check_embeddings_shape(embeddings, documents)
+        if isinstance(self.umap_model, pacmap.PaCMAP):
+            # TODO: allow inference based on PaCMAP
+            # Will require saving the original embeddings and passing them as an 
+            # `X_train` argument. 
+            # (see: https://github.com/YingfanWang/PaCMAP/blob/master/demo/transform_demo.py)
+            logger.info("`transform` is not currently supported when using PaCMAP as a model.")
+        else:        
+            check_is_fitted(self)
+            check_embeddings_shape(embeddings, documents)
 
-        if isinstance(documents, str):
-            documents = [documents]
+            if isinstance(documents, str):
+                documents = [documents]
 
-        if embeddings is None:
-            embeddings = self._extract_embeddings(documents,
-                                                  method="document",
-                                                  verbose=self.verbose)
+            if embeddings is None:
+                embeddings = self._extract_embeddings(documents,
+                                                    method="document",
+                                                    verbose=self.verbose)
+            umap_embeddings = self.umap_model.transform(embeddings)
+            logger.info("Reduced dimensionality")
 
-        umap_embeddings = self.umap_model.transform(embeddings)
-        logger.info("Reduced dimensionality")
+            # Extract predictions and probabilities if it is a HDBSCAN model
+            if isinstance(self.hdbscan_model, hdbscan.HDBSCAN):
+                predictions, probabilities = hdbscan.approximate_predict(self.hdbscan_model, umap_embeddings)
 
-        # Extract predictions and probabilities if it is a HDBSCAN model
-        if isinstance(self.hdbscan_model, hdbscan.HDBSCAN):
-            predictions, probabilities = hdbscan.approximate_predict(self.hdbscan_model, umap_embeddings)
+                # Calculate probabilities
+                if self.calculate_probabilities:
+                    probabilities = hdbscan.membership_vector(self.hdbscan_model, umap_embeddings)
+                    logger.info("Calculated probabilities with HDBSCAN")
 
-            # Calculate probabilities
-            if self.calculate_probabilities:
-                probabilities = hdbscan.membership_vector(self.hdbscan_model, umap_embeddings)
-                logger.info("Calculated probabilities with HDBSCAN")
+            else:
+                predictions = self.hdbscan_model.predict(umap_embeddings)
+                probabilities = None
+            logger.info("Predicted clusters")
 
-        else:
-            predictions = self.hdbscan_model.predict(umap_embeddings)
-            probabilities = None
-        logger.info("Predicted clusters")
-
-        # Map probabilities and predictions
-        probabilities = self._map_probabilities(probabilities, original_topics=True)
-        predictions = self._map_predictions(predictions)
-        return predictions, probabilities
+            # Map probabilities and predictions
+            probabilities = self._map_probabilities(probabilities, original_topics=True)
+            predictions = self._map_predictions(predictions)
+            return predictions, probabilities
 
     def topics_over_time(self,
                          docs: List[str],
